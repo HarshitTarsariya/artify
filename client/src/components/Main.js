@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import Identicon from 'identicon.js';
 
 class Main extends Component {
 
@@ -9,7 +10,7 @@ class Main extends Component {
           <main role="main" className="col-lg-12 ml-auto mr-auto" style={{ maxWidth: '500px' }}>
             <div className="content mr-auto ml-auto">
               <p>&nbsp;</p>
-              <h2>Share Image</h2>
+              <h2>Share Your Art</h2>
               <form onSubmit={(event) => {
                 event.preventDefault()
                 const description = this.imageDescription.value
@@ -26,13 +27,19 @@ class Main extends Component {
                         placeholder="Image description..."
                         required />
                   </div>
-                <button type="submit" className="btn btn-primary btn-block btn-lg">Upload!</button>
+                <button type="submit" className="btn btn-primary btn-sm">Upload</button>
               </form>
               <p>&nbsp;</p>
               { this.props.images.map((image, key) => {
                 return(
                   <div className="card mb-4" key={key} >
                     <div className="card-header">
+                    <img
+                        className='mr-2'
+                        width='30'
+                        height='30'
+                        src={`data:image/png;base64,${new Identicon(image.author, 30).toString()}`}
+                      />
                       <small className="text-muted">{image.author}</small>
                     </div>
                     <ul id="imageList" className="list-group list-group-flush">

@@ -50,7 +50,7 @@ contract Artify{
         Image memory _image=images[_id];
         address payable _author=_image.author;
 
-        //Send the tip to author (msg.value is ether value from tipper)
+        //Send the tip to author (msg.value is ether value from tipper which get stored in the contract balance (ie. address(this).balance))
         address(_author).transfer(msg.value);
 
         _image.tipAmount+=msg.value;

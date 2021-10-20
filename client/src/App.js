@@ -7,8 +7,8 @@ import Main from './components/Main';
 
 import ArtifyContract from "./contracts/Artify.json";
 
-const {create} = require('ipfs-http-client');
-const ipfs = create({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' });
+const ipfsClient = require('ipfs-http-client');
+const ipfs = ipfsClient({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' });
 
 function App() {
   const [state,setState]=useState({
@@ -32,52 +32,52 @@ function App() {
     }
     loadWeb3();
   },[]);
-  useEffect(() => {
-    async function loadDataFromBlockchain(){
-      const web3=window.web3;
+  async function loadDataFromBlockchain(){
+    const web3=window.web3;
 
-      //Loading account from metamask
-      const accounts=await web3.eth.getAccounts();
+    //Loading account from metamask
+    const accounts=await web3.eth.getAccounts();
+    setState((prevState)=>{
+      return {...prevState,account:accounts[0]};
+    });
+
+    //NetworkID of network on which smartcontract deployed
+    const networkId = await web3.eth.net.getId();
+    const networkData = ArtifyContract.networks[networkId];
+
+    if(networkData){
+
+      const artify = new web3.eth.Contract(ArtifyContract.abi,networkData.address);
       setState((prevState)=>{
-        return {...prevState,account:accounts[0]};
+        return {...prevState,artifyContractInstance:artify};
       });
 
-      //NetworkID of network on which smartcontract deployed
-      const networkId = await web3.eth.net.getId();
-      const networkData = ArtifyContract.networks[networkId];
 
-      if(networkData){
+      const imageCount=await artify.methods.imageCount().call();
+      setState((prevState)=>{
+        return {...prevState,imageCount:imageCount};
+      });
 
-        const artify = new web3.eth.Contract(ArtifyContract.abi,networkData.address);
+      // Load images
+      for (var i = 1; i <= imageCount; i++) {
+        const image = await artify.methods.images(i).call();
         setState((prevState)=>{
-          return {...prevState,artifyContractInstance:artify};
+          return {...prevState,images:[...prevState.images,image]};
         });
-
-        const imageCount=await artify.methods.imageCount().call();
-        setState((prevState)=>{
-          return {...prevState,imageCount:imageCount};
-        });
-
-        // Load images
-        for (var i = 1; i <= imageCount; i++) {
-          const image = await artify.methods.images(i).call();
-          setState((prevState)=>{
-            return {...prevState,images:[...prevState.images,image]};
-          });
-        }
-        // Sort images. Show highest tipped images first
-        setState((prevState)=>{
-          return {...prevState,images: state.images.sort((a,b) => b.tipAmount - a.tipAmount )};
-        });
-
-        setState((prevState)=>{
-          return {...prevState,loading: false};
-        });
-
-      }else{
-        window.alert(`Contract not deployed on ${networkId}`);
       }
+      // Sort images. Show highest tipped images first
+      setState((prevState)=>{
+        return {...prevState,images: prevState.images.sort((a,b) => b.tipAmount - a.tipAmount )};
+      });
+
+      setState((prevState)=>{
+        return {...prevState,loading: false};
+      });
+    }else{
+      window.alert(`Contract not deployed on ${networkId}`);
     }
+  }
+  useEffect(() => {
     loadDataFromBlockchain();
   },[]);
 
@@ -95,27 +95,23 @@ function App() {
     }
   }
 
-  const uploadImage = description => {
+  const uploadImage = async description => {
     console.log("Uploading File to IPFS")
     
     //adding file to the IPFS
-    ipfs.add(state.buffer, (error, result) => {
-      console.log('Ipfs result', result)
-      if(error) {
-        console.error(error)
-        return
-      }
+    for await (const file of await ipfs.add(state.buffer)) {
       console.log("DONE");
       setState((prevState)=>{
         return {...prevState,loading: true};
       });
-      state.artifyContractInstance.methods.uploadImage(result[0].hash, description).send({ from: state.account }).on('transactionHash', (hash) => {
+      state.artifyContractInstance.methods.uploadImage(file.path, description).send({ from: state.account }).on('transactionHash', (hash) => {
         setState((prevState)=>{
           return {...prevState,loading: false};
         });
-        
       })
-    })
+      console.log("HERE");
+      loadDataFromBlockchain();
+    }
   }
   
   const tipImageOwner=(id, tipAmount)=> {
@@ -130,7 +126,7 @@ function App() {
   }
 
   return (
-    <div>
+    <div className="container h-500 d-flex justify-content-center">
       <Header account={state.account}/>
       {
         state.loading?
